@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Notice & Licensing: DentO Sync Connector</title>
+    <!-- Import Premium Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: hsl(220, 25%, 8%);
+            --panel-bg: hsla(220, 25%, 12%, 0.75);
+            --border-color: hsla(220, 20%, 25%, 0.35);
+            --primary-glow: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(263, 85%, 60%));
+            --text-main: hsl(210, 20%, 90%);
+            --text-mute: hsl(210, 10%, 65%);
+            --accent-blue: hsl(217, 91%, 60%);
+            --accent-green: hsl(142, 70%, 45%);
+            --accent-orange: hsl(28, 90%, 55%);
+            --shadow-premium: 0 20px 45px -15px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Subtle animated background glow */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85vw;
+            height: 65vh;
+            background: radial-gradient(circle, hsla(217, 91%, 60%, 0.08) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 950px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Premium Navigation Bar / Header */
+        header {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 25px 40px;
+            box-shadow: var(--shadow-premium);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--primary-glow);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-img {
+            height: 38px;
+            width: 38px;
+            border-radius: 8px;
+            object-fit: contain;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .logo-text {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 24px;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+
+        .logo-badge {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            background: var(--primary-glow);
+            color: white;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Language Toggle Bar */
+        .lang-tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            border-radius: 12px;
+            gap: 4px;
+        }
+
+        .lang-tab {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-mute);
+            background: transparent;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lang-tab:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .lang-tab.active {
+            color: #ffffff;
+            background: var(--primary-glow);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        /* Content Sections */
+        .section-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(16px);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: var(--shadow-premium);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-2px);
+            border-color: hsla(217, 91%, 60%, 0.3);
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #ffffff;
+        }
+
+        .icon-accent {
+            width: 8px;
+            height: 26px;
+            background: var(--primary-glow);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        p, ul {
+            font-size: 0.98rem;
+            color: var(--text-main);
+            margin-bottom: 18px;
+        }
+
+        ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-left: 5px;
+        }
+
+        ul li {
+            position: relative;
+            padding-left: 28px;
+        }
+
+        ul li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-blue);
+            font-weight: 800;
+            font-size: 1.1rem;
+        }
+
+        /* Code and Git link boxes */
+        .git-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px 25px;
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .git-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s ease;
+        }
+
+        .git-link:hover {
+            color: var(--accent-blue);
+        }
+
+        .git-link-code {
+            font-family: monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        pre {
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid hsla(210, 15%, 20%, 0.6);
+            border-radius: 12px;
+            padding: 22px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.88rem;
+            overflow-x: auto;
+            color: hsl(200, 100%, 80%);
+            margin: 20px 0;
+        }
+
+        /* Warning Callout Box */
+        .callout-box {
+            background: hsla(28, 90%, 55%, 0.07);
+            border-left: 4px solid var(--accent-orange);
+            border-radius: 0 16px 16px 0;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .callout-box h4 {
+            color: var(--accent-orange);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .callout-box p {
+            margin-bottom: 0;
+            font-size: 0.95rem;
+        }
+
+        /* Grid Badge Options */
+        .grid-panel {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        @media (min-width: 600px) {
+            .grid-panel {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .grid-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .badge {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        .badge-green {
+            background: rgba(22, 163, 74, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(22, 163, 74, 0.25);
+        }
+
+        .badge-orange {
+            background: rgba(249, 115, 22, 0.12);
+            color: var(--accent-orange);
+            border: 1px solid rgba(249, 115, 22, 0.25);
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px 0 40px;
+            color: var(--text-mute);
+            font-size: 0.85rem;
+        }
+
+        /* Multilingual show/hide logic */
+        .lang-section {
+            display: none;
+        }
+
+        .lang-section.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .main-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.3rem;
+            font-weight: 800;
+            text-align: center;
+            margin: 10px 0 25px;
+            background: linear-gradient(135deg, #ffffff 40%, hsl(217, 91%, 75%) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            text-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        .main-title span {
+            background: none;
+            -webkit-text-fill-color: #4AC1BC;
+            color: #4AC1BC;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Interactive Header with Multilingual Switcher -->
+        <header>
+            <div class="logo-container">
+                <img src="https://odontobot-data-automation.web.app/api-access/app-icon.png" alt="Odonto.bot Logo" class="logo-img">
+                <span class="logo-text">Odonto.bot</span>
+                <span class="logo-badge">Developer Portal</span>
+            </div>
+
+            <!-- Selector Tabs -->
+            <div class="lang-tabs">
+                <button class="lang-tab active" onclick="switchLanguage('en')">🇬🇧 EN</button>
+                <button class="lang-tab" onclick="switchLanguage('it')">🇮🇹 IT</button>
+                <button class="lang-tab" onclick="switchLanguage('ro')">🇷🇴 RO</button>
+            </div>
+        </header>
+
+        <!-- ==================== ENGLISH SECTION ==================== -->
+        <div id="section-en" class="lang-section active">
+            <h1 class="main-title"><span>DentO</span> (Italy) to Odonto.Bot Connect</h1>
+            <!-- EU Interoperability Shield -->
+            <div class="section-card" style="margin-bottom: 30px;">
+                <h2><span class="icon-accent"></span>EU Interoperability Protection</h2>
+                <p>This offline sync connector utility is designed, distributed, and authorized under the legal protection afforded by the <strong>EU Software Directive (Directive 2009/24/EC, Article 6 - Decompilation)</strong> and its national transpositions.</p>
+                <ul>
+                    <li><strong>Right to Portability & Interoperability</strong>: EU legislation explicitly permits reverse engineering, file format analysis, and data extraction <i>without</i> the copyright holder's (Claris/Apple) consent, solely to achieve interoperability with independently created platforms.</li>
+                    <li><strong>Format De-obfuscation</strong>: Database block layouts (such as <code>.fmp12</code> and <code>.fmpur</code>) are not copyrightable. Bypassing the static XOR <code>0x5A</code> obfuscation mask falls under legal interoperability setup, not copyright circumvention.</li>
+                    <li><strong>Binary Isolation</strong>: This utility operates strictly in userland, invoking only standard API connections, and does not copy or modify proprietary FileMaker runtime engines or libraries.</li>
+                </ul>
+            </div>
+
+            <!-- Original Attributions & Git links -->
+            <div class="section-card" style="margin-bottom: 30px;">
+                <h2><span class="icon-accent"></span>Original Attributions & Repository Links</h2>
+                <p>The core parser modules are derived from the open-source <code>fmptools</code> project originally engineered by <strong>Evan Miller</strong> under the permissive <strong>MIT License</strong>.</p>
+                
+                <div class="git-panel">
+                    <a href="https://github.com/evanmiller/fmptools" target="_blank" class="git-link">
+                        <span>🐙 Original Author Repository:</span>
+                        <span class="git-link-code">github.com/evanmiller/fmptools</span>
+                    </a>
+                    <a href="https://github.com/marcelmateescu/fmptools" target="_blank" class="git-link">
+                        <span>⚡ Custom Interoperability Fork:</span>
+                        <span class="git-link-code">github.com/marcelmateescu/fmptools</span>
+                    </a>
+                </div>
+
+                <pre>Copyright (c) 2020 Evan Miller
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies...
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED...</pre>
+            </div>
+
+            <!-- Ownership and Business Source License (BSL 1.1) -->
+            <div class="section-card">
+                <h2><span class="icon-accent"></span>Ownership & Business Source License (BSL 1.1)</h2>
+                <p>All subsequent developments, XOR decryption boundaries, python schema scanners, and the multi-entity automated synchronizer client are owned by:</p>
+                <p style="font-weight: 600; font-size: 1.15rem; color: #ffffff; margin-bottom: 20px;">
+                    S.C. INFORMATICA ECOLOGICA TRANSILVANIA 2004 SRL<br>
+                    <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-mute);">EU VAT ID: RO17075938 | 35 Deleanu, CJ-400474 ROMANIA</span>
+                </p>
+                
+                <p>This software is distributed under the <strong>Business Source License 1.1 (BSL 1.1)</strong>. It allows viewing, testing, and non-commercial internal clinical or interoperability use, but strictly forbids competing with Odonto.bot or bundling into commercial software.</p>
+                
+                <div class="grid-panel">
+                    <div class="grid-card">
+                        <span class="badge badge-green">🟢 Licensed Use (Permitted Internal & Testing)</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;"><strong>Odonto.bot Connection:</strong> Licensed use is fully and PRIMARILY granted to establish secure database connection and offline synchronization with the <strong>Odonto.bot</strong> automation platform (of course!).<br><strong>Interoperability & Testing:</strong> You are authorized to copy, view, compile, test, and use the source code for personal, internal, non-commercial clinical, or interoperability testing purposes.</p>
+                    </div>
+                    <div class="grid-card">
+                        <span class="badge badge-orange">🔴 Explicit Competition & Commercial Restrictions</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;"><strong>No Platform Competition:</strong> Strictly forbidden from using the code/derivatives to build or host services competing with <strong>Odonto.bot</strong>.<br><strong>No SaaS/PMS Bundling:</strong> May not embed or package this connector into a commercial PMS, SaaS, or paid bundle without written consent.</p>
+                    </div>
+                </div>
+
+                <div class="grid-panel" style="margin-top: 0;">
+                    <div class="grid-card" style="grid-column: 1 / -1; background: hsla(217, 91%, 60%, 0.05); border-color: hsla(217, 91%, 60%, 0.25);">
+                        <span class="badge badge-green" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); border-color: rgba(59, 130, 246, 0.25);">📅 Change Date & GPLv3 Transition</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;">On <strong>June 1, 2040</strong> (the Change Date), the commercial and competition restrictions above will expire automatically, and the Software will transition fully to the open-source <strong>GNU General Public License v3 (GPLv3)</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="callout-box">
+                    <h4>Licensing & Custom Inquiries</h4>
+                    <p>For express commercial licensing, white-label partnerships, or custom SaaS integrations, please reach out to the development team at <strong>iet2k4@gmail.com</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ITALIAN SECTION ==================== -->
+        <div id="section-it" class="lang-section">
+            <h1 class="main-title"><span>DentO</span> (Italia) a Odonto.Bot Connect</h1>
+            <!-- EU Interoperability Shield (IT) -->
+            <div class="section-card" style="margin-bottom: 30px;">
+                <h2><span class="icon-accent"></span>Scudo Legale UE per l'Interoperabilità</h2>
+                <p>Questo connettore è progettato, distribuito e autorizzato sotto la protezione legale offerta dalla <strong>Direttiva Europea sul Software (Direttiva 2009/24/CE, Articolo 6 - Decompilazione)</strong> e il relativo recepimento nazionale italiano <strong>(Legge 22 aprile 1941 n. 633, Articolo 64-quater)</strong>.</p>
+                <ul>
+                    <li><strong>Diritto alla Portabilità e Interoperabilità</strong>: La legislazione UE consente esplicitamente la decompilazione, l'analisi dei formati di file e l'estrazione dei dati <i>senza</i> il consenso del titolare del copyright (Claris/Apple), al solo scopo di consentire l'interoperabilità con piattaforme indipendenti.</li>
+                    <li><strong>Decodifica del Formato</strong>: Le strutture dei file di database (come <code>.fmp12</code> e <code>.fmpur</code>) non costituiscono espressioni protette da copyright. Il bypass della maschera statica XOR <code>0x5A</code> per l'estrazione costituisce un accesso legittimo per motivi di interoperabilità.</li>
+                    <li><strong>Isolamento Binario</strong>: Questa utility opera esclusivamente in userland, invocando solo normali connessioni API, e non copia o modifica codice binario protetto da copyright del runtime FileMaker.</li>
+                </ul>
+            </div>
+
+            <!-- Original Attributions & Git links (IT) -->
+            <div class="section-card" style="margin-bottom: 30px;">
+                <h2><span class="icon-accent"></span>Attribuzioni Originali e Link Repository</h2>
+                <p>I moduli parser C derivano dal progetto open-source <code>fmptools</code> originariamente sviluppato da <strong>Evan Miller</strong> sotto licenza <strong>MIT</strong>.</p>
+                
+                <div class="git-panel">
+                    <a href="https://github.com/evanmiller/fmptools" target="_blank" class="git-link">
+                        <span>🐙 Repository Autore Originale:</span>
+                        <span class="git-link-code">github.com/evanmiller/fmptools</span>
+                    </a>
+                    <a href="https://github.com/marcelmateescu/fmptools" target="_blank" class="git-link">
+                        <span>⚡ Fork per Interoperabilità:</span>
+                        <span class="git-link-code">github.com/marcelmateescu/fmptools</span>
+                    </a>
+                </div>
+
+                <pre>Copyright (c) 2020 Evan Miller
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies...</pre>
+            </div>
+
+            <!-- Ownership and Business Source License (BSL 1.1) (IT) -->
+            <div class="section-card">
+                <h2><span class="icon-accent"></span>Proprietà e Business Source License (BSL 1.1)</h2>
+                <p>Tutte le successive modifiche, decrittografie XOR, estrattori python e il connettore automatico multientità sono sviluppati e di proprietà di:</p>
+                <p style="font-weight: 600; font-size: 1.15rem; color: #ffffff; margin-bottom: 20px;">
+                    S.C. INFORMATICA ECOLOGICA TRANSILVANIA 2004 SRL<br>
+                    <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-mute);">P.IVA UE: RO17075938 | 35 Deleanu, CJ-400474 ROMANIA</span>
+                </p>
+                
+                <p>Questo software è distribuito sotto la licenza <strong>Business Source License 1.1 (BSL 1.1)</strong>. Consente di visualizzare, testare e utilizzare il codice sorgente per scopi interni e di interoperabilità non commerciale, ma vieta la concorrenza con Odonto.bot o il bundling in PMS/SaaS commerciali.</p>
+                
+                <div class="grid-panel">
+                    <div class="grid-card">
+                        <span class="badge badge-green">🟢 Uso Consentito (Interno e Test)</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;"><strong>Connessione a Odonto.bot:</strong> L'uso concesso è pienamente e PRINCIPALMENTE destinato a stabilire la connessione sicura del database e la sincronizzazione offline con la piattaforma di automazione <strong>Odonto.bot</strong> (ovviamente!).<br><strong>Interoperabilità e Test:</strong> È consentito a chiunque visualizzare, compilare, testare e utilizzare il codice sorgente per scopi personali, interni e di test di interoperabilità clinica non commerciale.</p>
+                    </div>
+                    <div class="grid-card">
+                        <span class="badge badge-orange">🔴 Restrizioni Commerciali e di Concorrenza</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;"><strong>Nessuna Concorrenza:</strong> È severamente vietato utilizzare il Software o i suoi derivati per competere direttamente o indirettamente con la piattaforma <strong>Odonto.bot</strong>.<br><strong>Nessun Bundling SaaS/PMS:</strong> Non è consentito integrare questo connettore in gestionali PMS o SaaS commerciali senza preventivo consenso scritto.</p>
+                    </div>
+                </div>
+
+                <div class="grid-panel" style="margin-top: 0;">
+                    <div class="grid-card" style="grid-column: 1 / -1; background: hsla(217, 91%, 60%, 0.05); border-color: hsla(217, 91%, 60%, 0.25);">
+                        <span class="badge badge-green" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); border-color: rgba(59, 130, 246, 0.25);">📅 Data di Scadenza e Nuova Licenza</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;">A partire dal <strong>1 Giugno 2040</strong>, le restrizioni commerciali decadranno automaticamente e il Software sarà rilasciato sotto la licenza open-source standard <strong>GNU General Public License v3 (GPLv3)</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="callout-box">
+                    <h4>Richieste di Licenza Commerciale</h4>
+                    <p>Per richiedere diritti di utilizzo commerciale o integrazioni personalizzate in sistemi gestionali PMS di terze parti, si prega di contattare direttamente l'autore all'indirizzo email <strong>iet2k4@gmail.com</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ROMANIAN SECTION ==================== -->
+        <div id="section-ro" class="lang-section">
+            <h1 class="main-title"><span>DentO</span> (Italia) la Odonto.Bot Connect</h1>
+            <!-- EU Interoperability Shield (RO) -->
+            <div class="section-card" style="margin-bottom: 30px;">
+                <h2><span class="icon-accent"></span>Scutul Legal UE pentru Interoperabilitate</h2>
+                <p>Acest utilitar de sincronizare offline este proiectat, distribuit și autorizat sub protecția legală oferită de <strong>Directiva UE privind programele pe calculator (Directiva 2009/24/CE, Articolul 6 - Decompilare)</strong> și transpunerea sa în legislația din România <strong>(Legea nr. 8/1996 privind dreptul de autor)</strong>.</p>
+                <ul>
+                    <li><strong>Dreptul la Portabilitate și Interoperabilitate</strong>: Legislația UE permite în mod explicit decompilarea, analiza formatelor de fișiere și extragerea de date <i>fără</i> consimțământul titularului drepturilor de autor (Claris/Apple), exclusiv în scopul asigurării interoperabilității cu platforme create independent.</li>
+                    <li><strong>Decodificarea Măștii XOR</strong>: Structurile fișierelor de date (cum ar fi <code>.fmp12</code> și <code>.fmpur</code>) nu constituie expresii protejabile prin drepturi de autor. Decriptarea măștii statice simple XOR <code>0x5A</code> reprezintă un acces legitim pentru interoperabilitate.</li>
+                    <li><strong>Izolare Completă</strong>: Acest script rulează exclusiv în spațiul utilizatorului (userland), utilizează conexiuni standard prin API și nu copiază sau modifică cod binar FileMaker proprietar.</li>
+                </ul>
+            </div>
+
+            <!-- Original Attributions & Git links (RO) -->
+            <div class="section-card" style="margin-bottom: 30px;">
+                <h2><span class="icon-accent"></span>Atribuire Originală și Link-uri Git</h2>
+                <p>Modulele C de analiză structurală sunt derivate din biblioteca open-source <code>fmptools</code> creată inițial de <strong>Evan Miller</strong> sub licența **MIT**.</p>
+                
+                <div class="git-panel">
+                    <a href="https://github.com/evanmiller/fmptools" target="_blank" class="git-link">
+                        <span>🐙 Repository Autor Original:</span>
+                        <span class="git-link-code">github.com/evanmiller/fmptools</span>
+                    </a>
+                    <a href="https://github.com/marcelmateescu/fmptools" target="_blank" class="git-link">
+                        <span>⚡ Fork pentru Interoperabilitate:</span>
+                        <span class="git-link-code">github.com/marcelmateescu/fmptools</span>
+                    </a>
+                </div>
+
+                <pre>Copyright (c) 2020 Evan Miller
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies...</pre>
+            </div>
+
+            <!-- Ownership and Business Source License (BSL 1.1) (RO) -->
+            <div class="section-card">
+                <h2><span class="icon-accent"></span>Proprietate și Business Source License (BSL 1.1)</h2>
+                <p>Toate modificările ulterioare, decriptarea XOR, scripturile Python și clientul de sincronizare automată sunt dezvoltate și deținute de:</p>
+                <p style="font-weight: 600; font-size: 1.15rem; color: #ffffff; margin-bottom: 20px;">
+                    S.C. INFORMATICA ECOLOGICA TRANSILVANIA 2004 SRL<br>
+                    <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-mute);">CUI UE: RO17075938 | Deleanu 35, CJ-400474 ROMÂNIA</span>
+                </p>
+                
+                <p>Acest software este distribuit sub licența <strong>Business Source License 1.1 (BSL 1.1)</strong>. Permite vizualizarea, testarea și utilizarea codului sursă în scopuri interne și de interoperabilitate clinică non-comercială, dar interzice explicit concurența cu Odonto.bot sau integrarea în platforme comerciale PMS/SaaS.</p>
+                
+                <div class="grid-panel">
+                    <div class="grid-card">
+                        <span class="badge badge-green">🟢 Utilizare Permisă (Internă și Testare)</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;"><strong>Conectare la Odonto.bot:</strong> Dreptul de utilizare este acordat deplin și ÎN PRIMUL RÂND pentru a stabili o conexiune securizată a bazei de date și sincronizarea offline cu platforma de automatizare <strong>Odonto.bot</strong> (desigur!).<br><strong>Interoperabilitate și Testare:</strong> Este permis oricărei persoane să vizualizeze, compileze, testeze și să utilizeze codul sursă pentru scopuri personale, interne și de testare a interoperabilității non-comerciale.</p>
+                    </div>
+                    <div class="grid-card">
+                        <span class="badge badge-orange">🔴 Restricții Explicite de Concurență și Utilizare Comercială</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;"><strong>Fără Concurență Directă:</strong> Este strict interzisă utilizarea acestui program pentru a concura direct sau indirect cu platforma <strong>Odonto.bot</strong>.<br><strong>Fără Integrare PMS/SaaS:</strong> Este interzisă integrarea sau redistribuirea ca parte a unui sistem comercial PMS sau SaaS fără acord prealabil scris.</p>
+                    </div>
+                </div>
+
+                <div class="grid-panel" style="margin-top: 0;">
+                    <div class="grid-card" style="grid-column: 1 / -1; background: hsla(217, 91%, 60%, 0.05); border-color: hsla(217, 91%, 60%, 0.25);">
+                        <span class="badge badge-green" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); border-color: rgba(59, 130, 246, 0.25);">📅 Data Schimbării Licenței (Change Date)</span>
+                        <p style="font-size: 0.92rem; margin-top: 5px;">La data de <strong>1 Iunie 2040</strong>, restricțiile comerciale și de concurență de mai sus vor expira, iar software-ul va trece automat sub licența open-source standard <strong>GNU General Public License v3 (GPLv3)</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="callout-box">
+                    <h4>Solicitări de Licențiere Comercială</h4>
+                    <p>Pentru a solicita drepturi de utilizare comercială sau integrări specifice în sisteme gestionale PMS comerciale, vă rugăm să contactați direct reprezentantul legal la adresa <strong>iet2k4@gmail.com</strong>.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            &copy; 2026 S.C. INFORMATICA ECOLOGICA TRANSILVANIA 2004 SRL. All rights reserved.
+        </footer>
+    </div>
+
+    <!-- Multilingual dynamic tab switching script -->
+    <script>
+        function switchLanguage(langCode) {
+            // Remove active classes from all tabs
+            const tabs = document.querySelectorAll('.lang-tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Remove active classes from all sections
+            const sections = document.querySelectorAll('.lang-section');
+            sections.forEach(sec => sec.classList.remove('active'));
+
+            // Find current clicked tab and add active
+            const clickedTab = Array.from(tabs).find(tab => tab.innerText.includes(langCode.toUpperCase()));
+            if (clickedTab) clickedTab.classList.add('active');
+
+            // Find target section and make active
+            const targetSection = document.getElementById('section-' + langCode);
+            if (targetSection) targetSection.classList.add('active');
+        }
+    </script>
+</body>
+</html>

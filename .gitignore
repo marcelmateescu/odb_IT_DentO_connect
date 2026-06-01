@@ -1,0 +1,35 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Heavy FileMaker Pro runtime and resource files (Proprietary IP)
+*.fmpur
+*.fmp12
+*.app/
+Extensions/
+*.pdf
+
+# EXPLICIT ORIGINAL DENTO RUNTIME FILES (NOT FOR REDISTRIBUTION)
+Algt.fmpur
+DentO.app/
+Dnt.fmpur
+Extensions/
+FMP Acknowledgements.pdf
+Hlp.fmpur
+Mnl.fmpur
+Trcct.fmpur
+iFatturaPA_3_2.fmpur
+
+# SQLite databases & JSON exports (Contains sensitive patient medical records)
+*.sqlite
+*.json
+*.log
+*.txt
+
+# Locally cloned and compiled C-tool dependencies
+.deps/
+.libs/
+autom4te.cache/
+
+# Local configuration credentials
+local_config.json
