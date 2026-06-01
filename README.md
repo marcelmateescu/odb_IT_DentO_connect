@@ -83,12 +83,12 @@ This sync connector is distributed under the source-available **Business Source 
     *   **No SaaS or PMS Bundling**: You are strictly prohibited from embedding, bundling, or packaging this connector into any commercial dental Practice Management System (PMS), SaaS platform, or paid connector bundle without express written consent.
 *   **📅 Change Date**: On **June 1, 2040**, the restrictions above will expire, and this repository will automatically transition to be licensed under the standard open-source **GNU General Public License v3 (GPLv3)**.
 
-### 🏛️ Interactive Licensing Portal & HTML Hosting
+### 🏛️ Interactive Licensing Portal & Live BSL 1.1 Notice
 *   For a formal standard legal notice, read the **[LEGAL.md](file:///Users/mateescu_m/Desktop/RuntimeDento_6.9.8/LEGAL.md)** file.
-*   The project also features a premium, interactive glassmorphic legal portal with live multilingual selectors (**IT/EN/RO**) in **[LEGAL.html](file:///Users/mateescu_m/Desktop/RuntimeDento_6.9.8/LEGAL.html)**.
+*   **Live Interactive Legal Portal**: The project features a premium, glassmorphic legal portal with active multilingual selectors (**IT/EN/RO**), hosted live via GitHub Pages at:
+    👉 **[marcelmateescu.github.io/odb_IT_DentO_connect/LEGAL.html](https://marcelmateescu.github.io/odb_IT_DentO_connect/LEGAL.html)**
+*   You can also view the local file template in **[LEGAL.html](file:///Users/mateescu_m/Desktop/RuntimeDento_6.9.8/LEGAL.html)**.
 
-> [!NOTE]  
-> **How to display the beautiful interactive HTML portal online**:  
-> Since Git hosting platforms (like GitHub) display raw code rather than rendering `.html` files, we advise two simple methods to host the interactive `LEGAL.html` portal:
-> 1. **GitHub Pages (Free)**: Enable GitHub Pages in your repository settings. The portal will instantly compile and be served publicly at `https://marcelmateescu.github.io/odb_IT_DentO_connect/LEGAL.html`.
-> 2. **Odonto.bot Web Hosting (Branded)**: Copy `LEGAL.html` to your Firebase Hosting bucket for the main application at `https://odontobot-data-automation.web.app/legal.html` to serve it as a sleek, native page.
+> [!TIP]  
+> **Branded Web Hosting Option**:  
+> In addition to GitHub Pages, you can also copy `LEGAL.html` to your central Firebase Hosting bucket for the main application to serve it natively at `https://odontobot-data-automation.web.app/legal.html`.
