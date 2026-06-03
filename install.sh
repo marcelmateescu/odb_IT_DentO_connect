@@ -60,31 +60,23 @@ else
     exit 1
 fi
 
-# Make configure executable if necessary
-if [ -f "configure" ]; then
-    chmod +x configure
-else
-    # Auto-generation using autotools if configure doesn't exist
-    if command -v autoreconf &> /dev/null; then
-        echo -e "   » Generating configure script using autotools..."
-        autoreconf -i
-    else
-        echo -e "${RED}❌ Error: 'configure' script is missing and autotools are not installed.${NC}"
-        exit 1
-    fi
-fi
-
-echo -e "   » Configuring locally optimized build..."
-./configure --silent
-
-echo -e "   » Compiling binary tools locally (make)..."
-make --silent
+# Compile fmp2sqlite directly with clang — no autotools, no Homebrew needed.
+# The system libiconv (bundled with Xcode Command Line Tools) is always available.
+echo -e "   » Compiling fmp2sqlite with clang (direct, no autotools needed)..."
+clang -o fmp2sqlite \
+    -DVERSION=\"bundled\" \
+    src/block.c src/dump_file.c src/fmp.c \
+    src/list_columns.c src/list_tables.c \
+    src/read_values.c src/scsu.c \
+    src/bin/fmp2sqlite.c src/bin/usage.c \
+    -I src -lsqlite3 -liconv 2>&1
 
 # Verify that compilation completed successfully
-if [ -f "fmp2sqlite" ] || [ -f "src/bin/fmp2sqlite" ]; then
-    echo -e "   » ${GREEN}Compilation Succeeded!${NC} Binary tools built locally."
+if [ -f "fmp2sqlite" ]; then
+    echo -e "   » ${GREEN}Compilation Succeeded!${NC} fmp2sqlite built locally."
 else
-    echo -e "${RED}❌ Local C compilation failed. Please verify build flags in config.log.${NC}"
+    echo -e "${RED}❌ Local C compilation failed.${NC}"
+    echo -e "${YELLOW}👉 Make sure Xcode Command Line Tools are installed: xcode-select --install${NC}"
     exit 1
 fi
 

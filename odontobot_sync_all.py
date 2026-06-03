@@ -5,17 +5,68 @@ import sys
 import json
 import sqlite3
 import logging
+import logging.handlers
+import datetime
 from typing import List, Dict, Any
 
-# Configure logging with premium aesthetics
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S"
-)
-logger = logging.getLogger("odontobot_sync_all")
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING SETUP
+#   • Console  → human-readable, INFO+
+#   • File     → odontobot_sync.log (next to this script), DEBUG+, rotating
+#                every entry is a JSON object so the file is machine-parseable
+# ─────────────────────────────────────────────────────────────────────────────
+_LOG_DIR  = os.path.dirname(os.path.abspath(__file__))
+_LOG_FILE = os.path.join(_LOG_DIR, "odontobot_sync.log")
+
+
+class _JsonFileFormatter(logging.Formatter):
+    """Emits one JSON object per line for easy grepping / forwarding."""
+    def format(self, record: logging.LogRecord) -> str:
+        entry: dict = {
+            "ts":      datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            "level":  record.levelname,
+            "logger": record.name,
+            "msg":    record.getMessage(),
+        }
+        # If the record carries extra structured data (added via extra={...})
+        # include it verbatim so HTTP traces are fully embedded.
+        for key in ("http_request", "http_response"):
+            if hasattr(record, key):
+                entry[key] = getattr(record, key)
+        if record.exc_info:
+            entry["exc"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+
+def _build_logger() -> logging.Logger:
+    log = logging.getLogger("odontobot_sync_all")
+    log.setLevel(logging.DEBUG)
+
+    # Console handler – pretty, INFO and above
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S"
+    ))
+    log.addHandler(ch)
+
+    # Rotating file handler – detailed JSON, 5 MB × 5 backups
+    fh = logging.handlers.RotatingFileHandler(
+        _LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(_JsonFileFormatter())
+    log.addHandler(fh)
+
+    return log
+
+
+logger = _build_logger()
+logger.info(f"📝 Detailed log file: {_LOG_FILE}")
 
 DEFAULT_API_BASE_URL = "https://api-5nu4fdmgma-od.a.run.app/v1"
+ODB_CONNECTION_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odb_connection.json")
 TOMATO_CONFIG_PATH = "/Users/mateescu_m/Desktop/noma/sTomato/local_config.json"
 DB_PATH = "/Users/mateescu_m/Desktop/RuntimeDento_6.9.8/Dnt.fmpur"
 SITE_ID = "cmpog8fp7000jju04l8vz7sb5" # Primary sTomato clinic location code from sTomato mock
@@ -23,30 +74,77 @@ PRACTITIONER_ID = "cmpog8fnz000iju047zqpfkaq" # Primary practitioner provider ID
 
 def load_config() -> tuple:
     """
-    Loads active Tenant ID, Auth Token, and Base API URL.
+    Loads Tenant ID, Auth Bearer value, Base API URL, and whether a Tenant
+    Sync Key (odonto_sk_*) is in use.
+
+    Priority order:
+      1. odb_connection.json  (Tenant Sync Key or legacy api_key + tenant)
+      2. sTomato local_config.json  (legacy authorization + tenant_id)
+      3. ODONTOBOT_AUTH_TOKEN environment variable  (fallback)
+
+    Returns: (tenant_id, bearer_value, api_base_url, is_sync_key)
+      is_sync_key=True  → caller must send ONLY Authorization header (no X-Tenant-ID)
+      is_sync_key=False → caller must send Authorization + X-Tenant-ID (legacy scheme)
     """
     logger.info("⚙️ Loading configuration credentials...")
-    tenant_id = "demo_RO"
+    tenant_id  = "demo_RO"
     auth_token = None
+    is_sync_key = False
     api_base_url = os.getenv("ODONTOBOT_API_BASE_URL", DEFAULT_API_BASE_URL)
-    
-    if os.path.exists(TOMATO_CONFIG_PATH):
+
+    # ── 1. odb_connection.json (highest priority) ─────────────────────────────
+    if os.path.exists(ODB_CONNECTION_PATH):
+        try:
+            with open(ODB_CONNECTION_PATH, "r", encoding="utf-8") as f:
+                odb = json.load(f)
+            raw_key   = odb.get("api_key", "")
+            odb_tenant = odb.get("tenant", tenant_id)
+            if raw_key:
+                # Tenant Sync Key: odonto_sk_live_* / odonto_sk_test_*
+                # → self-identifying credential; no X-Tenant-ID needed
+                if raw_key.startswith("odonto_sk_"):
+                    auth_token  = f"Bearer {raw_key}"
+                    tenant_id   = odb_tenant
+                    is_sync_key = True
+                    logger.info(
+                        f"   » Tenant Sync Key loaded from odb_connection.json. "
+                        f"Tenant: '{tenant_id}' (X-Tenant-ID header suppressed)"
+                    )
+                else:
+                    # Legacy api_key stored in odb_connection.json
+                    bearer = raw_key if raw_key.startswith("Bearer ") else f"Bearer {raw_key}"
+                    auth_token = bearer
+                    tenant_id  = odb_tenant
+                    logger.info(
+                        f"   » Legacy API key loaded from odb_connection.json. "
+                        f"Tenant: '{tenant_id}'"
+                    )
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to parse {ODB_CONNECTION_PATH}: {e}. Falling back.")
+
+    # ── 2. sTomato local_config.json (fallback) ───────────────────────────────
+    if not auth_token and os.path.exists(TOMATO_CONFIG_PATH):
         try:
             with open(TOMATO_CONFIG_PATH, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
-                tenant_id = config_data.get("tenant_id", tenant_id)
-                auth_token = config_data.get("authorization")
+            tenant_id  = config_data.get("tenant_id", tenant_id)
+            raw_auth   = config_data.get("authorization", "")
+            if raw_auth:
+                auth_token = raw_auth if raw_auth.startswith("Bearer ") else f"Bearer {raw_auth}"
                 logger.info(f"   » Config loaded from sTomato local_config. Tenant ID: '{tenant_id}'")
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse {TOMATO_CONFIG_PATH}: {e}.")
-            
+
+    # ── 3. Environment variable (last resort) ─────────────────────────────────
     if not auth_token:
-        auth_token = os.getenv("ODONTOBOT_AUTH_TOKEN")
-        if not auth_token:
+        raw_env = os.getenv("ODONTOBOT_AUTH_TOKEN", "")
+        if raw_env:
+            auth_token = raw_env if raw_env.startswith("Bearer ") else f"Bearer {raw_env}"
+        else:
             logger.error("❌ Critical: Authorization token missing!")
             sys.exit(1)
-            
-    return tenant_id, auth_token, api_base_url
+
+    return tenant_id, auth_token, api_base_url, is_sync_key
 
 def decrypt_database() -> bytearray:
     """
@@ -61,6 +159,120 @@ def decrypt_database() -> bytearray:
         raw_data = f.read()
         
     return bytearray(b ^ 0x5A for b in raw_data)
+
+def parse_scheda_lines(text: str) -> list:
+    r"""
+    Extracts treatment lines (elenco prestazioni) from the decrypted binary text.
+
+    Each treatment record in the FMP binary follows this format:
+        <COGNOME NOME>Y\<YEAR>\<...>\<CATEGORY>\<TOOTH_CODE>\<DESCRIPTION>\PY<PRICE>\...
+        optionally ending with \IS<DD-MM-YYYY> = execution date (data esecuzione).
+
+    A line WITH an execution date is "done"; without it, it is "planned".
+
+    Returns a list of dicts with keys:
+        patient, description, category, tooth, price, exec_date (str or None)
+    """
+    # Pattern matches the FMP12 treatment record block.
+    # Group 1: patient name (COGNOME NOME)
+    # Group 2: listino year
+    # Group 3: category (Igiene e Prevenzione, Protesi, etc.)
+    # Group 4: tooth code (e.g. INF, 46)
+    # Group 5: description (e.g. Ablazione del tartaro)
+    # Group 6: price digits
+    # Group 7: record ID (numeric, after \U_)
+    # Group 8 (optional): execution date DD-MM-YYYY after \IS
+    pat = re.compile(
+        r'([A-Z][A-Z]{1,20}\s[A-Z][A-Z]{1,20})'
+        r'[YZ]\\(\d{4})\\'
+        r'[^\\]{0,40}'
+        r'([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ ]{3,40})'
+        r'\\[A-Z]{1,4}'
+        r'([A-Z0-9]{1,5})'
+        r'\\[A-Z]{1,3}'
+        r'([A-Za-zÀ-ÿ][^\\]{4,80})'
+        r'\\PY(\d{2,6})'
+        r'.{0,300}?'
+        r'\\U_(\d{4,8})'
+        r'(?:\\IS(\d{1,2}-\d{2}-\d{4}))?',
+        re.DOTALL
+    )
+    lines = []
+    for m in pat.finditer(text):
+        patient    = m.group(1).strip()
+        year       = m.group(2)
+        category   = m.group(3).strip()
+        tooth      = m.group(4).strip()
+        desc       = m.group(5).strip()
+        price_str  = m.group(6)
+        record_id  = m.group(7)
+        exec_date  = m.group(8)  # None if not matched
+
+        # Skip UI/layout artefacts (too short, garbage chars)
+        if len(desc) < 5 or not desc[0].isalpha():
+            continue
+        try:
+            price = float(price_str)
+        except ValueError:
+            price = 0.0
+
+        lines.append({
+            "patient":    patient,
+            "year":       year,
+            "category":   category,
+            "tooth":      tooth,
+            "description": desc,
+            "price":      price,
+            "record_id":  record_id,
+            "exec_date":  exec_date,  # DD-MM-YYYY string or None
+        })
+    return lines
+
+
+def detect_sospeso(text: str, patient_name: str) -> bool:
+    """
+    Returns True if the DentO binary contains a 'sospeso' scheda status flag
+    within proximity of the given patient name block.
+
+    In the FMP12 binary stream the scheda status field appears as the literal
+    string 'sospeso' (lowercase) adjacent to the patient's scheda record.
+    """
+    # Find all occurrences of the patient name and check for 'sospeso' nearby
+    name_pat = re.compile(re.escape(patient_name), re.IGNORECASE)
+    sospeso_pat = re.compile(r'sospeso', re.IGNORECASE)
+    WINDOW = 2000  # bytes radius around the name occurrence
+
+    for m in name_pat.finditer(text):
+        start = max(0, m.start() - WINDOW)
+        end   = min(len(text), m.end() + WINDOW)
+        chunk = text[start:end]
+        if sospeso_pat.search(chunk):
+            return True
+    return False
+
+
+def derive_quote_status(lines: list, sospeso: bool = False) -> str:
+    """
+    Derives the odonto.bot quote status from DentO scheda data.
+
+    Priority order:
+      1. 'sospeso' flag set in DentO         → 'pending'
+      2. ALL lines have an execution date    → 'done'
+      3. SOME lines have an execution date   → 'active'
+      4. NO  lines have an execution date    → 'draft'
+    """
+    if sospeso:
+        return "pending"
+    if not lines:
+        return "draft"
+    executed = [l for l in lines if l["exec_date"]]
+    if len(executed) == len(lines):
+        return "done"
+    elif len(executed) > 0:
+        return "active"
+    else:
+        return "draft"
+
 
 def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
     """
@@ -161,57 +373,114 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
             "kind_color": "#16A34A"
         })
         
-    # 3. Extract treatments from clinical actions
+    # 3 & 4. Extract scheda treatment lines and build quotes
+    # -------------------------------------------------------
+    # Parse real treatment line records (elenco prestazioni) from the binary.
+    # Each record carries the execution date iff the treatment has been performed.
+    text = decrypted_bytes.decode('latin-1', errors='replace')
+    raw_lines = parse_scheda_lines(text)
+    logger.info(f"   » Scheda line records parsed from binary: {len(raw_lines)}")
+
+    # Group lines by patient name (each patient can have multiple schede).
+    # For simplicity we create one quote per patient (all lines in one plan).
+    from collections import defaultdict
+    by_patient: Dict[str, list] = defaultdict(list)
+    for line in raw_lines:
+        by_patient[line["patient"]].append(line)
+
     treatments = []
-    admin_matches = re.findall(rb'Admin\s+\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\s+Admin\s+([^\x00-\x1f\x7f-\xff]+)', decrypted_bytes)
-    treatment_label = "Impianto"
-    for match_b in admin_matches:
-        match_str = match_b.decode('utf-8', errors='ignore').strip()
-        if "Impianto" in match_str:
-            logger.info(f"   » Discovered Treatment Log: '{match_str}'")
-            treatment_label = "Impianto"
-            break
-            
-    treatments.append({
-        "treatment_id": "treat_1",
-        "patient_id": "1",
-        "teeth": ["16"],
-        "label": treatment_label,
-        "note": "Impianto dentale in titanio",
-        "price": 1200.0,
-        "code_clinic": "IMP-01",
-        "code_catalog": "D6010",
-        "date": "2026-05-31T17:29:48.000Z",
-        "status": "done"
-    })
-    
-    # 4. Construct Quote (Treatment Plan Preventivo) relational items
-    quotes = [{
-        "quote_id": "q_1",
-        "patient_id": "1",
-        "total_amount": 1200.0,
-        "status": "draft",
-        "created": "2026-05-31T17:29:48.000Z",
-        "lines": [{
-            "quote_line_id": "ql_1",
-            "quote_id": "q_1",
-            "teeth": ["16"],
-            "label": "Impianto in titanio",
-            "price": 1200.0,
-            "code_clinic": "IMP-01",
-            "code_catalog": "D6010",
-            "external_system_id": "ql_1",
+    quotes     = []
+
+    for patient_name, p_lines in by_patient.items():
+        # Match back to the patient record (first match wins)
+        matched_patient = next(
+            (p for p in patients
+             if patient_name.startswith(p["last_name"].upper())
+             or patient_name.endswith(p["first_name"].upper())),
+            patients[0] if patients else {"id": "1"}
+        )
+        pid = str(matched_patient["id"])
+
+        is_sospeso   = detect_sospeso(text, patient_name)
+        quote_status = derive_quote_status(p_lines, sospeso=is_sospeso)
+        total_amount = sum(l["price"] for l in p_lines)
+
+        # Build treatment objects (one per executed line)
+        for i, line in enumerate(p_lines):
+            if line["exec_date"]:
+                # Convert DD-MM-YYYY → YYYY-MM-DDTHH:MM:SS.000Z
+                parts = line["exec_date"].split("-")
+                if len(parts) == 3:
+                    day, month, year = parts
+                    iso_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}T00:00:00.000Z"
+                else:
+                    iso_date = "2026-01-01T00:00:00.000Z"
+                treatments.append({
+                    "treatment_id": f"treat_{pid}_{i+1}",
+                    "patient_id": pid,
+                    "teeth": [line["tooth"]] if line["tooth"] else [],
+                    "label": line["description"],
+                    "note": line["category"],
+                    "price": line["price"],
+                    "code_clinic": line["tooth"],
+                    "code_catalog": "",
+                    "date": iso_date,
+                    "status": "done"
+                })
+                logger.info(f"   » Treatment [{i+1}]: '{line['description']}' — executed {line['exec_date']} ✅")
+            else:
+                logger.info(f"   » Treatment [{i+1}]: '{line['description']}' — no execution date (planned) ⏳")
+
+        # Build quote lines (all lines, executed or not)
+        quote_lines = []
+        for i, line in enumerate(p_lines):
+            quote_lines.append({
+                "quote_line_id":        f"ql_{pid}_{i+1}",
+                "quote_id":             f"q_{pid}",
+                "teeth":                [line["tooth"]] if line["tooth"] else [],
+                "label":                line["description"],
+                "price":                line["price"],
+                "code_clinic":          line["tooth"],
+                "code_catalog":         "",
+                "external_system_id":   line["record_id"],
+                "external_system_code": "dento"
+            })
+
+        quotes.append({
+            "quote_id":             f"q_{pid}",
+            "patient_id":           pid,
+            "total_amount":         total_amount,
+            "status":               quote_status,
+            "created":              "2026-01-01T00:00:00.000Z",
+            "lines":                quote_lines,
+            "external_system_id":   f"q_{pid}",
             "external_system_code": "dento"
-        }],
-        "external_system_id": "q_1",
-        "external_system_code": "dento"
-    }]
-    
+        })
+        logger.info(
+            f"   » Quote for {patient_name}: {len(p_lines)} lines, "
+            f"{len([l for l in p_lines if l['exec_date']])} done "
+            f"→ status='{quote_status}' total=€{total_amount:.2f}"
+        )
+
+    # Fallback: if no scheda lines were parsed, emit a safe draft placeholder
+    if not quotes:
+        logger.warning("⚠️  No scheda lines extracted — emitting draft placeholder quote.")
+        quotes.append({
+            "quote_id":             "q_1",
+            "patient_id":           "1",
+            "total_amount":         0.0,
+            "status":               "draft",
+            "created":              "2026-01-01T00:00:00.000Z",
+            "lines":                [],
+            "external_system_id":   "q_1",
+            "external_system_code": "dento"
+        })
+
     return {
-        "patients": patients,
+        "patients":     patients,
         "appointments": appointments,
-        "treatments": treatments,
-        "quotes": quotes
+        "treatments":   treatments,
+        "quotes":       quotes
     }
 
 def main():
@@ -219,7 +488,7 @@ def main():
     logger.info("🦷 ODONTO.BOT FULL AUTOMATED METRICS SYNCHRONIZATION UTILITY 🦷")
     logger.info("========================================================================================================")
     
-    tenant_id, auth_token, api_base_url = load_config()
+    tenant_id, auth_token, api_base_url, is_sync_key = load_config()
     decrypted_bytes = decrypt_database()
     data = extract_entities(decrypted_bytes)
     
@@ -228,12 +497,68 @@ def main():
     except ImportError:
         logger.error("❌ requests package missing! Run: pip install requests")
         sys.exit(1)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # HTTP HELPER  – logs every outgoing request + incoming response to file
+    # ─────────────────────────────────────────────────────────────────────────
+    def http_post(url: str, headers: dict, payload: dict | None = None, timeout: int = 30):
+        """
+        Thin wrapper around requests.post that:
+          • Logs the full outgoing request (URL, sanitised headers, body) to file
+          • Logs the full incoming response (status, headers, body) to file
+          • Returns the Response object unchanged
+        """
+        safe_headers = {
+            k: ("<REDACTED>" if k.lower() in ("authorization", "x-api-key") else v)
+            for k, v in headers.items()
+        }
+        req_info = {
+            "method":  "POST",
+            "url":     url,
+            "headers": safe_headers,
+            "body":    payload,
+        }
+        logger.debug(
+            f"→ HTTP POST {url}",
+            extra={"http_request": req_info}
+        )
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            resp_info = {
+                "status":  resp.status_code,
+                "headers": dict(resp.headers),
+                "body":    resp.text,
+            }
+            level = logging.DEBUG if resp.status_code < 400 else logging.WARNING
+            logger.log(
+                level,
+                f"← HTTP {resp.status_code} from {url}",
+                extra={"http_response": resp_info}
+            )
+            return resp
+        except Exception as exc:
+            logger.error(
+                f"❌ HTTP POST exception for {url}: {exc}",
+                extra={"http_request": req_info},
+                exc_info=True
+            )
+            raise
         
-    sync_headers = {
-        "X-Tenant-ID": tenant_id,
-        "Authorization": auth_token,
-        "Content-Type": "application/json"
-    }
+    # Tenant Sync Key → self-identifying; no X-Tenant-ID required per API docs.
+    # Legacy key      → must include X-Tenant-ID for tenant routing.
+    if is_sync_key:
+        sync_headers = {
+            "Authorization": auth_token,
+            "Content-Type":  "application/json"
+        }
+        logger.info("   » Auth mode: Tenant Sync Key (Authorization only, no X-Tenant-ID)")
+    else:
+        sync_headers = {
+            "X-Tenant-ID":   tenant_id,
+            "Authorization": auth_token,
+            "Content-Type":  "application/json"
+        }
+        logger.info("   » Auth mode: Legacy (Authorization + X-Tenant-ID)")
     
     # ==================== 0.1 SYNC SITES ====================
     logger.info("--------------------------------------------------------------------------------------------------------")
@@ -266,7 +591,7 @@ def main():
     }
     sync_s_url = f"{api_base_url.rstrip('/')}/sync/sites"
     try:
-        response = requests.post(sync_s_url, json=site_payload, headers=sync_headers, timeout=30)
+        response = http_post(sync_s_url, headers=sync_headers, payload=site_payload, timeout=30)
         if response.status_code == 200:
             logger.info(f"🎉 Sites Ingested Successfully: {response.text}")
         else:
@@ -297,7 +622,7 @@ def main():
     }
     sync_pr_url = f"{api_base_url.rstrip('/')}/sync/practitioners"
     try:
-        response = requests.post(sync_pr_url, json=pract_payload, headers=sync_headers, timeout=30)
+        response = http_post(sync_pr_url, headers=sync_headers, payload=pract_payload, timeout=30)
         if response.status_code == 200:
             logger.info(f"🎉 Practitioners Ingested Successfully: {response.text}")
         else:
@@ -330,7 +655,7 @@ def main():
         
     sync_p_url = f"{api_base_url.rstrip('/')}/sync/patients"
     try:
-        response = requests.post(sync_p_url, json={"patients": normalized_patients}, headers=sync_headers, timeout=30)
+        response = http_post(sync_p_url, headers=sync_headers, payload={"patients": normalized_patients}, timeout=30)
         if response.status_code == 200:
             logger.info(f"🎉 Patients Ingested Successfully: {response.text}")
         else:
@@ -370,7 +695,7 @@ def main():
         
     sync_a_url = f"{api_base_url.rstrip('/')}/sync/appointments"
     try:
-        response = requests.post(sync_a_url, json={"appointments": normalized_appts}, headers=sync_headers, timeout=30)
+        response = http_post(sync_a_url, headers=sync_headers, payload={"appointments": normalized_appts}, timeout=30)
         if response.status_code == 200:
             logger.info(f"🎉 Appointments Ingested Successfully: {response.text}")
         else:
@@ -405,7 +730,7 @@ def main():
         
     sync_t_url = f"{api_base_url.rstrip('/')}/sync/treatments"
     try:
-        response = requests.post(sync_t_url, json={"treatments": normalized_treatments}, headers=sync_headers, timeout=30)
+        response = http_post(sync_t_url, headers=sync_headers, payload={"treatments": normalized_treatments}, timeout=30)
         if response.status_code == 200:
             logger.info(f"🎉 Treatments Ingested Successfully: {response.text}")
         else:
@@ -454,7 +779,7 @@ def main():
     
     staged_quotes_success = False
     try:
-        response = requests.post(sync_q_url, json={"quotes": normalized_quotes}, headers=sync_headers, timeout=30)
+        response = http_post(sync_q_url, headers=sync_headers, payload={"quotes": normalized_quotes}, timeout=30)
         if response.status_code == 200:
             logger.info(f"🎉 Quotes successfully staged: {response.text}")
             staged_quotes_success = True
@@ -469,7 +794,7 @@ def main():
         
         reconciliation_succeeded = False
         try:
-            response = requests.post(reconcile_q_url, headers=sync_headers, timeout=60)
+            response = http_post(reconcile_q_url, headers=sync_headers, payload=None, timeout=60)
             if response.status_code == 200:
                 logger.info(f"🎉 Quotes reconciliation merge completed: {response.text}")
                 reconciliation_succeeded = True
@@ -484,7 +809,7 @@ def main():
             direct_q_url = f"{api_base_url.rstrip('/')}/sync/quotes"
             try:
                 logger.info(f"👉 Outgoing HTTP Call: POST {direct_q_url}")
-                direct_response = requests.post(direct_q_url, json={"quotes": normalized_quotes}, headers=sync_headers, timeout=30)
+                direct_response = http_post(direct_q_url, headers=sync_headers, payload={"quotes": normalized_quotes}, timeout=30)
                 if direct_response.status_code == 200:
                     logger.info(f"🎉 DIRECT QUOTE SYNC COMPLETED SUCCESSFULLY! Response: {direct_response.text}")
                 else:

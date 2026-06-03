@@ -1,3 +1,5 @@
+** 1 jumne 2026 **
+GEMINI 3.% Flash:
 I will write a premium Windows deployment batch script `install_odb_dento.cmd` that mirrors the macOS installer logic, checking prerequisites, setting up Python libraries, running testing checks, and automatically scheduling an hourly Windows background task using the native Task Scheduler engine (`schtasks`).
 
 Edited install_odb_dento.cmd
