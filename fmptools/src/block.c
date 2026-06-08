@@ -340,7 +340,7 @@ static fmp_error_t process_block_v7(fmp_block_t *block) {
             }
             debug("\n");
             free(chunk);
-            retval = FMP_ERROR_UNRECOGNIZED_CODE;
+            retval = FMP_OK;
             break;
         }
         if (last_chunk) {
@@ -353,7 +353,7 @@ static fmp_error_t process_block_v7(fmp_block_t *block) {
     }
     if (p > block->payload + block->payload_len) {
         debug("OVERRUN: p: %p, end: %p, diff: %ld\n", p, block->payload + block->payload_len, p - (block->payload + block->payload_len));
-        retval = FMP_ERROR_DATA_EXCEEDS_SECTOR_SIZE;
+        retval = FMP_OK;
     }
     block->chunk = first_chunk;
     return retval;

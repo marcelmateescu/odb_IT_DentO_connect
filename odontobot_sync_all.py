@@ -276,58 +276,124 @@ def derive_quote_status(lines: list, sospeso: bool = False) -> str:
 
 def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
     """
-    Scans the decrypted binary stream using regex signature matching.
+    Scans the decrypted binary stream using regex signature matching and adjacent print stream checks.
     """
     logger.info("🔍 Scanning database stream for patient, appointment, and treatment records...")
     
-    # 1. Parse Patient details using signature logs
-    pattern = re.compile(
-        rb'Admin\s+\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\s+([A-Za-z_]+)\s+([^\x00-\x1f\x7f-\xff]+)'
-    )
-    matches = pattern.findall(decrypted_bytes)
-    
-    records = {}
-    for field_name_b, val_b in matches:
-        field_name = field_name_b.decode('ascii', errors='ignore').strip()
-        val = val_b.decode('utf-8', errors='ignore').strip()
-        if len(val) < 2 or "ZZ" in val or "ZV" in val:
-            continue
-        if field_name not in records:
-            records[field_name] = []
-        records[field_name].append(val)
-        
-    cognomi   = records.get("cognome", [])
-    nomi      = records.get("nome", [])
-    indirizzi = records.get("indirizzo", [])
-    citta     = records.get("citta", [])
-    born      = records.get("natoIl", [])
-    emails    = records.get("emailCasa", [])
-    cellulari = records.get("cellulare", [])
-    telefoni  = records.get("telefono", [])   # home phone fallback
-    sessi     = records.get("sesso", [])
+    # Block system/clinic/UI email addresses by normalized value.
+    _SYSTEM_EXACT = {
+        "demo_dento_it@odonto.bot", "info@dento.it", "sdi01@pec.fatturapa.it",
+        "pec@destinatario.com", "xxxx@pec.it", "xxxx@libero.it",
+        "pippopollo@libero.it", "germano.usoni@gmail.com",
+        "studio.usoni@icloud.com", "geusoni@tiscalinet.it",
+        "BIOgeusoni@tiscalinet.it", "II@invia.subitosms.it",
+        "germano.usoni@pec.andi.it", "mail@sandrobramati.it",
+    }
+    _SYSTEM_FRAGMENTS = ("filemaker", "svgC", "pngb", "@TZ.", "@fZ.", "Ú@Ú",
+                         "NE@Ò", "ZZZ@", "ZZZZ@", "YXÚ@", "ê@fZ")
 
-    patients = []
-    limit = min(len(cognomi), len(nomi))
-    seen = set()
-    for i in range(limit):
-        key = (cognomi[i].upper(), nomi[i].upper())
-        if key in seen:
+    # 1. Parse Patient details using audit trail logs chronologically
+    pattern = re.compile(
+        rb'Admin\s+(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}(?::\d{2})?)\s+([@A-Za-z0-9_]+)\s+([^\x00-\x1f\x7f-\xff]+)'
+    )
+    
+    matches = []
+    for m in pattern.finditer(decrypted_bytes):
+        ts = m.group(1).decode('ascii', errors='ignore').strip()
+        field = m.group(2).decode('ascii', errors='ignore').strip()
+        val = m.group(3).decode('utf-8', errors='ignore').strip()
+        if len(val) < 1 or "ZZ" in val or "ZV" in val:
             continue
-        seen.add(key)
-        # Phone: prefer cellulare, fall back to telefono
-        phone_val = cellulari[i] if i < len(cellulari) else (
-                    telefoni[i]  if i < len(telefoni)  else "")
+        matches.append((ts, field, val))
+        
+    raw_patients = []
+    curr_pat = {}
+    
+    for ts, field, val in matches:
+        if field == "cognome":
+            if curr_pat and curr_pat.get("last_name") and curr_pat["last_name"].upper() != val.upper():
+                raw_patients.append(curr_pat)
+                curr_pat = {}
+            curr_pat["last_name"] = val
+        elif field == "nome":
+            curr_pat["first_name"] = val
+        elif field == "sesso":
+            curr_pat["gender"] = val
+        elif field == "natoIl":
+            curr_pat["birth_date"] = val
+        elif field == "indirizzo":
+            curr_pat["address"] = val
+        elif field == "citta":
+            curr_pat["city"] = val
+        elif field == "@mail":
+            curr_pat["email"] = val
+        elif field in ("numeroTelefono1", "cellulare", "telefono"):
+            curr_pat["phone"] = val
+            
+    if curr_pat and curr_pat.get("last_name"):
+        raw_patients.append(curr_pat)
+        
+    patients = []
+    text_latin = decrypted_bytes.decode('latin-1', errors='replace')
+    
+    for idx, p in enumerate(raw_patients):
+        last_name = p.get("last_name", "")
+        first_name = p.get("first_name", "")
+        
+        # Format birth_date correctly (YYYY-MM-DD instead of DD/MM/YYYY)
+        birth_date = p.get("birth_date", "1978-02-10")
+        if "/" in birth_date:
+            parts = birth_date.split("/")
+            if len(parts) == 3:
+                birth_date = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                
+        # Ensure email, phone, and gender are populated, using adjacent print stream fallback if missing
+        email = p.get("email", "")
+        phone = p.get("phone", "")
+        gender = p.get("gender", "")
+        
+        if not email or not phone or not gender:
+            # Fallback search in surrounding text near patient name
+            full_name_1 = f"{last_name.upper()} {first_name.upper()}"
+            full_name_2 = f"{first_name.upper()} {last_name.upper()}"
+            
+            for name_var in (full_name_1, full_name_2):
+                for m in re.finditer(re.escape(name_var), text_latin, re.IGNORECASE):
+                    start_pos = max(0, m.start() - 3000)
+                    end_pos = min(len(text_latin), m.end() + 3000)
+                    chunk = text_latin[start_pos:end_pos]
+                    
+                    if not email:
+                        email_match = re.search(r'[\w.\-]+@[\w.\-]+\.[a-zA-Z]{2,}', chunk)
+                        if email_match:
+                            e = email_match.group(0)
+                            if e not in _SYSTEM_EXACT and not any(frag in e for frag in _SYSTEM_FRAGMENTS):
+                                email = e
+                    if not phone:
+                        phone_match = re.search(r'(?<!\d)(09\d{6,8}|3[0-9]{8,9})(?!\d)', chunk)
+                        if phone_match:
+                            phone = phone_match.group(0)
+                    if not gender:
+                        gender_match = re.search(r'Sesso.{0,8}([MF])(?!\w)', chunk, re.IGNORECASE)
+                        if gender_match:
+                            gender = gender_match.group(1).upper()
+                    if email and phone and gender:
+                        break
+                if email and phone and gender:
+                    break
+                    
         patients.append({
-            "id":         "1",  # Standard test ID
-            "first_name": nomi[i],
-            "last_name":  cognomi[i],
-            "birth_date": born[i] if i < len(born) else "1978-02-10",
-            "address":    indirizzi[i] if i < len(indirizzi) else "corso Martignano",
-            "city":       citta[i] if i < len(citta) else "Trento",
-            "email":      emails[i]   if i < len(emails)    else "",
-            "phone":      phone_val,
-            "gender":     sessi[i]    if i < len(sessi)     else "",
+            "id":          str(idx + 1),
+            "first_name":  first_name,
+            "last_name":   last_name,
+            "birth_date":  birth_date,
+            "address":     p.get("address", "corso Martignano"),
+            "city":        p.get("city", "Trento"),
+            "email":       email,
+            "phone":       phone,
+            "gender":      gender,
         })
+        logger.info(f"   » Resolved Patient: {first_name} {last_name} | Email: {email} | Phone: {phone} | Gender: {gender}")
 
     # Fallback default if regex signature scan has limited records
     if not patients:
@@ -335,13 +401,14 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
             "id":         "1",
             "first_name": "GIANNI",
             "last_name":  "DELPONTE",
-            "birth_date": "10/02/1978",
+            "birth_date": "1978-02-10",
             "address":    "corso Martignano",
             "city":       "Trento",
             "email":      "gdp@odonto.bot",
             "phone":      "09889987",
             "gender":     "M",
         })
+        logger.info("   » Resolved Patient (Fallback): GIANNI DELPONTE | Email: gdp@odonto.bot | Phone: 09889987 | Gender: M")
         
     # 2. Extract appointments from Esecuzione logs
     appointments = []
@@ -361,9 +428,18 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
                 iso_date = f"{d_parts[2]}-{d_parts[1]}-{d_parts[0]}"
                 starts_at = f"{iso_date}T{start_match.group(1)}"
                 
+                # Match patient ID dynamically based on name in log
+                pat_id = "1"
+                for p in patients:
+                    fullname = f"{p['last_name'].upper()} {p['first_name'].upper()}"
+                    fullname_rev = f"{p['first_name'].upper()} {p['last_name'].upper()}"
+                    if fullname in match_str.upper() or fullname_rev in match_str.upper():
+                        pat_id = p["id"]
+                        break
+                        
                 appointments.append({
                     "appointment_id": "appt_1",
-                    "patient_id": "1",
+                    "patient_id": pat_id,
                     "starts_at": starts_at,
                     "duration_minutes": 60, # Difference between 10:00 and 11:00
                     "status": "scheduled",
@@ -377,7 +453,7 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
         # Default fallback appointment matching signature
         appointments.append({
             "appointment_id": "appt_1",
-            "patient_id": "1",
+            "patient_id": patients[0]["id"] if patients else "1",
             "starts_at": "2026-05-28T10:00:00",
             "duration_minutes": 60,
             "status": "scheduled",
@@ -501,6 +577,42 @@ def main():
     logger.info("🦷 ODONTO.BOT FULL AUTOMATED METRICS SYNCHRONIZATION UTILITY 🦷")
     logger.info("========================================================================================================")
     
+    # ── Run SQLite Export via fmp2sqlite ────────────────────────────────────
+    logger.info("⚙️ Exporting FileMaker database to SQLite...")
+    sqlite_path = os.path.join(_LOG_DIR, "Dnt_Decrypted.sqlite")
+    binary_path = os.path.join(_LOG_DIR, "fmptools", "fmp2sqlite")
+    
+    if os.path.exists(sqlite_path):
+        try:
+            os.remove(sqlite_path)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to remove old SQLite file {sqlite_path}: {e}")
+            
+    if os.path.exists(binary_path):
+        import subprocess
+        try:
+            result = subprocess.run(
+                f'"{binary_path}" "{DB_PATH}" "{sqlite_path}"',
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                shell=True,
+                check=True
+            )
+            logger.info(f"🎉 SQLite export completed successfully: {sqlite_path}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"❌ SQLite export failed with exit code {e.returncode}!")
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"❌ SQLite export failed: {e}")
+            sys.exit(1)
+    else:
+        logger.error(f"❌ fmp2sqlite binary not found at {binary_path}! Please compile it first.")
+        sys.exit(1)
+
+    dry_run = "--dry-run" in sys.argv or "-d" in sys.argv
+    if dry_run:
+        logger.info("🧪 DRY RUN MODE ACTIVE: API calls will be logged but not sent to the cloud.")
+
     tenant_id, auth_token, api_base_url, is_sync_key = load_config()
     decrypted_bytes = decrypt_database()
     data = extract_entities(decrypted_bytes)
@@ -536,7 +648,14 @@ def main():
             extra={"http_request": req_info}
         )
         try:
-            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            if dry_run:
+                class MockResponse:
+                    status_code = 200
+                    text = '{"status": "dry_run_success"}'
+                    headers = {"content-type": "application/json"}
+                resp = MockResponse()
+            else:
+                resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
             resp_info = {
                 "status":  resp.status_code,
                 "headers": dict(resp.headers),
@@ -545,7 +664,7 @@ def main():
             level = logging.DEBUG if resp.status_code < 400 else logging.WARNING
             logger.log(
                 level,
-                f"← HTTP {resp.status_code} from {url}",
+                f"← HTTP {resp.status_code} from {url}" + (" (MOCK)" if dry_run else ""),
                 extra={"http_response": resp_info}
             )
             return resp
