@@ -3,7 +3,6 @@ import os
 import re
 import sys
 import json
-import sqlite3
 import logging
 import logging.handlers
 import datetime
@@ -577,41 +576,6 @@ def main():
     logger.info("🦷 ODONTO.BOT FULL AUTOMATED METRICS SYNCHRONIZATION UTILITY 🦷")
     logger.info("========================================================================================================")
     
-    # ── Run SQLite Export via fmp2sqlite ────────────────────────────────────
-    logger.info("⚙️ Exporting FileMaker database to SQLite...")
-    sqlite_path = os.path.join(_LOG_DIR, "Dnt_Decrypted.sqlite")
-    binary_path = os.path.join(_LOG_DIR, "fmptools", "fmp2sqlite")
-    
-    if os.path.exists(sqlite_path):
-        try:
-            os.remove(sqlite_path)
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to remove old SQLite file {sqlite_path}: {e}")
-            
-    if os.path.exists(binary_path):
-        import subprocess
-        try:
-            # Sanitize environment to avoid macOS dynamic loader library conflicts
-            clean_env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON") and not k.startswith("DYLD")}
-            result = subprocess.run(
-                f'"{binary_path}" "{DB_PATH}" "{sqlite_path}"',
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                shell=True,
-                env=clean_env,
-                check=True
-            )
-            logger.info(f"🎉 SQLite export completed successfully: {sqlite_path}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"❌ SQLite export failed with exit code {e.returncode}!")
-            sys.exit(1)
-        except Exception as e:
-            logger.error(f"❌ SQLite export failed: {e}")
-            sys.exit(1)
-    else:
-        logger.error(f"❌ fmp2sqlite binary not found at {binary_path}! Please compile it first.")
-        sys.exit(1)
-
     dry_run = "--dry-run" in sys.argv or "-d" in sys.argv
     if dry_run:
         logger.info("🧪 DRY RUN MODE ACTIVE: API calls will be logged but not sent to the cloud.")

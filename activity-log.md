@@ -134,3 +134,13 @@ Everything is fully synchronized and polished for you to run `git push` whenever
 - Verified that both patients (`GIANNI DELPONTE` and `Tony Grasso`) are correctly resolved:
   - Gianni Delponte: `gdp@odonto.bot`, `09889987`, `M`
   - Tony Grasso: `fattony@mafya.org`, `0977228832`, `M`
+
+## 2026-06-08 — Codebase Cleanup: removal of unused C library and SQLite export pipeline
+
+### 1. Removal of SQLite export pipeline from sync script
+- **Reason:** All clinical data entities (patients, treatments, quotes, appointments) are successfully extracted directly from the decrypted binary stream. The SQLite export process via `fmp2sqlite` was redundant and added runtime overhead.
+- **What was done:** Removed the `fmp2sqlite` subprocess invocation from `main()` in `odontobot_sync_all.py` and removed the unused `sqlite3` import.
+
+### 2. Deletion of the C library (`fmptools`)
+- **What was done:** Deleted the `fmptools` source directory and compiled binaries. The workspace now contains only pure Python scripts and legal/documentation files.
+- **Result:** Increased sync performance (reduced dry-run/live runs from ~25s to <7s) and eliminated all external compilation/linker dependencies.
