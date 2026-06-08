@@ -119,3 +119,18 @@ Everything is fully synchronized and polished for you to run `git push` whenever
 
 ### 3. Dry Run execution pipeline
 - Added `--dry-run` (`-d`) command-line option to test database export, decryption, and data extraction pipelines locally without executing remote API requests.
+
+## 2026-06-08 — Connector: support single-digit calendar dates & macOS linker sanitization
+
+### 1. Single-digit calendar date regex support
+- **Problem:** When patient Tony Grasso was added to the database with a date containing a single-digit calendar day (e.g., `8-06-2026` / June 8th), the audit trail extractor failed to match the date.
+- **What was done:** Updated the regex pattern in `odontobot_sync_all.py` from `\d{2}-\d{2}-\d{4}` to `\d{1,2}-\d{1,2}-\d{4}` to match dates with single-digit day or month formats.
+
+### 2. macOS dynamic loader environment sanitization
+- **Problem:** Running `subprocess.run` inside a Python script loading `sqlite3` caused macOS dynamic linker library conflicts that resulted in `exit code -11` (Segmentation Fault) during SQLite export.
+- **What was done:** Sanitized the environment variables passed to `subprocess.run` by filtering out variables starting with `PYTHON` and `DYLD` prefixes.
+
+### 3. Verification
+- Verified that both patients (`GIANNI DELPONTE` and `Tony Grasso`) are correctly resolved:
+  - Gianni Delponte: `gdp@odonto.bot`, `09889987`, `M`
+  - Tony Grasso: `fattony@mafya.org`, `0977228832`, `M`

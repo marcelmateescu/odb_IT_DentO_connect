@@ -294,7 +294,7 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
 
     # 1. Parse Patient details using audit trail logs chronologically
     pattern = re.compile(
-        rb'Admin\s+(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}(?::\d{2})?)\s+([@A-Za-z0-9_]+)\s+([^\x00-\x1f\x7f-\xff]+)'
+        rb'Admin\s+(\d{1,2}-\d{1,2}-\d{4}\s+\d{2}:\d{2}(?::\d{2})?)\s+([@A-Za-z0-9_]+)\s+([^\x00-\x1f\x7f-\xff]+)'
     )
     
     matches = []
@@ -591,11 +591,14 @@ def main():
     if os.path.exists(binary_path):
         import subprocess
         try:
+            # Sanitize environment to avoid macOS dynamic loader library conflicts
+            clean_env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON") and not k.startswith("DYLD")}
             result = subprocess.run(
                 f'"{binary_path}" "{DB_PATH}" "{sqlite_path}"',
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 shell=True,
+                env=clean_env,
                 check=True
             )
             logger.info(f"🎉 SQLite export completed successfully: {sqlite_path}")
