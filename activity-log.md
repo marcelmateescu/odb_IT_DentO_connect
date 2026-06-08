@@ -54,3 +54,51 @@ To serve your beautiful glassmorphic **[LEGAL.html](file:///Users/mateescu_m/Des
         `https://odontobot-data-automation.web.app/legal.html`
 
 Everything is fully synchronized and polished for you to run `git push` whenever you are ready!
+---
+
+## 2026-06-08 — `e6adc06` — Connector: detailed logging, Tenant Sync Key auth, patient contact fields
+
+### 1. Detailed rotating log file (`odontobot_sync.log`)
+
+**Problem:** Console output was too sparse to diagnose API failures or share with odonto.bot support.
+
+**What was done:**
+- Added `_JsonFileFormatter` — every log entry written to file is a single JSON object with `ts`, `level`, `msg`, and optionally `http_request` / `http_response` blocks.
+- Added a `RotatingFileHandler` (5 MB × 5 backups) writing to `odontobot_sync.log` next to the script. File is gitignored via `*.log`.
+- Introduced `http_post()` helper inside `main()` — wraps every `requests.post` call to log the full outgoing payload (URL, sanitised headers with `Authorization` redacted, JSON body) and the full incoming response (status, response headers, body) before returning the response unchanged.
+- Console output unchanged (INFO-level, human-readable).
+
+### 2. Tenant Sync Key authentication via `odb_connection.json`
+
+**Problem:** The new odonto.bot API uses per-clinic Tenant Sync Keys (`odonto_sk_*`) that are self-identifying — no `X-Tenant-ID` header should be sent alongside them.
+
+**What was done:**
+- Added `ODB_CONNECTION_PATH` constant pointing to `odb_connection.json` (same directory as the script, gitignored via `*.json`).
+- Rewrote `load_config()` with a 3-level priority chain:
+  1. `odb_connection.json` — reads `api_key` + `tenant`; detects `odonto_sk_*` prefix → Tenant Sync Key mode
+  2. sTomato `local_config.json` — legacy fallback
+  3. `ODONTOBOT_AUTH_TOKEN` environment variable — last resort
+- When Tenant Sync Key detected: `sync_headers` built without `X-Tenant-ID`.
+- `Authorization` always normalised to `Bearer <value>` regardless of source format.
+- Key rotated from `odonto_sk_test_13159b12…` → `odonto_sk_test_c994b6b8…` on 2026-06-08 (stored in `odb_connection.json`, not committed).
+- Verified: full sync to tenant `demo_it` — all 6 pipelines passed.
+
+### 3. Patient email, phone, gender now synced
+
+**Problem:** DELPONTE GIANNI had `gdp@odonto.bot`, `09889987`, gender `M` visible in DentO but the corresponding odonto.bot columns were arriving empty after sync.
+
+**Root cause:** `extract_entities()` was only reading 5 fields from the binary (`cognome`, `nome`, `indirizzo`, `citta`, `natoIl`). The fields `emailCasa`, `cellulare`, `telefono`, `sesso` were matched by the existing regex but silently discarded.
+
+**What was done:**
+- `extract_entities()` now reads `emailCasa`, `cellulare` (preferred), `telefono` (fallback), `sesso` from the records dict and attaches them to each patient object.
+- Hardcoded fallback patient seeded with known values from the DentO UI.
+- `normalized_patients` loop maps `p.get("email")`, `p.get("phone")`, `p.get("gender")` into the sync payload.
+
+### 4. Minor warnings fixed
+
+| Warning | Fix |
+|---|---|
+| `SyntaxWarning: invalid escape sequence '\<'` in `parse_scheda_lines` | Docstring converted to `r"""` |
+| `DeprecationWarning: datetime.utcnow()` | Replaced with `datetime.now(datetime.UTC)` |
+
+**Commit:** `e6adc06` — pushed to `origin/main`
