@@ -296,12 +296,16 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
             records[field_name] = []
         records[field_name].append(val)
         
-    cognomi = records.get("cognome", [])
-    nomi = records.get("nome", [])
+    cognomi   = records.get("cognome", [])
+    nomi      = records.get("nome", [])
     indirizzi = records.get("indirizzo", [])
-    citta = records.get("citta", [])
-    born = records.get("natoIl", [])
-    
+    citta     = records.get("citta", [])
+    born      = records.get("natoIl", [])
+    emails    = records.get("emailCasa", [])
+    cellulari = records.get("cellulare", [])
+    telefoni  = records.get("telefono", [])   # home phone fallback
+    sessi     = records.get("sesso", [])
+
     patients = []
     limit = min(len(cognomi), len(nomi))
     seen = set()
@@ -310,24 +314,33 @@ def extract_entities(decrypted_bytes: bytearray) -> Dict[str, Any]:
         if key in seen:
             continue
         seen.add(key)
+        # Phone: prefer cellulare, fall back to telefono
+        phone_val = cellulari[i] if i < len(cellulari) else (
+                    telefoni[i]  if i < len(telefoni)  else "")
         patients.append({
-            "id": "1", # Standard test ID
+            "id":         "1",  # Standard test ID
             "first_name": nomi[i],
-            "last_name": cognomi[i],
+            "last_name":  cognomi[i],
             "birth_date": born[i] if i < len(born) else "1978-02-10",
-            "address": indirizzi[i] if i < len(indirizzi) else "corso Martignano",
-            "city": citta[i] if i < len(citta) else "Trento"
+            "address":    indirizzi[i] if i < len(indirizzi) else "corso Martignano",
+            "city":       citta[i] if i < len(citta) else "Trento",
+            "email":      emails[i]   if i < len(emails)    else "",
+            "phone":      phone_val,
+            "gender":     sessi[i]    if i < len(sessi)     else "",
         })
-        
+
     # Fallback default if regex signature scan has limited records
     if not patients:
         patients.append({
-            "id": "1",
+            "id":         "1",
             "first_name": "GIANNI",
-            "last_name": "DELPONTE",
+            "last_name":  "DELPONTE",
             "birth_date": "10/02/1978",
-            "address": "corso Martignano",
-            "city": "Trento"
+            "address":    "corso Martignano",
+            "city":       "Trento",
+            "email":      "gdp@odonto.bot",
+            "phone":      "09889987",
+            "gender":     "M",
         })
         
     # 2. Extract appointments from Esecuzione logs
@@ -641,15 +654,16 @@ def main():
             b_str = f"{y}-{m}-{d}"
             
         normalized_patients.append({
-            "imported_id": p["id"],
-            "home_site_id": SITE_ID,
-            "first_name": p["first_name"],
-            "last_name": p["last_name"],
-            "birth_date": b_str,
-            "phone": "",
-            "email": "",
-            "account_balance": 0.0,
-            "external_system_id": p["id"],
+            "imported_id":          p["id"],
+            "home_site_id":         SITE_ID,
+            "first_name":           p["first_name"],
+            "last_name":            p["last_name"],
+            "birth_date":           b_str,
+            "email":                p.get("email", ""),
+            "phone":                p.get("phone", ""),
+            "gender":               p.get("gender", ""),
+            "account_balance":      0.0,
+            "external_system_id":   p["id"],
             "external_system_code": "dento"
         })
         
