@@ -102,3 +102,20 @@ Everything is fully synchronized and polished for you to run `git push` whenever
 | `DeprecationWarning: datetime.utcnow()` | Replaced with `datetime.now(datetime.UTC)` |
 
 **Commit:** `e6adc06` — pushed to `origin/main`
+
+## 2026-06-08 — `3ecc300` — Connector: automated SQLite export, robust patient contact extraction
+
+### 1. SQLite database export automation
+- Integrated compiled `fmp2sqlite` executable into `odontobot_sync_all.py` as a `subprocess` run during initialization.
+- Added `shell=True` and redirected output to `subprocess.DEVNULL` to avoid dynamic loader version mismatches and prevent pipe buffer deadlock/segfaults on macOS.
+- Bypasses old SQLite files and recreates the SQLite database cleanly on each run.
+
+### 2. Robust patient details extraction
+- Refactored `extract_entities()` to parse patient data chronologically from the decrypted binary stream audit trail logs.
+- Support optional seconds in audit trail timestamps (e.g. `17:28`) and special character field names (like `@mail` and `numeroTelefono1`).
+- Included gender (`sesso`) matching by supporting single-character values (`len(val) >= 1`).
+- Implemented a fallback scanner searching the surrounding decrypted binary text adjacent to the patient name for email, phone, and gender if they are not resolved chronologically.
+- Resolves Gianni Delponte with email `gdp@odonto.bot`, phone `09889987`, and gender `M` perfectly.
+
+### 3. Dry Run execution pipeline
+- Added `--dry-run` (`-d`) command-line option to test database export, decryption, and data extraction pipelines locally without executing remote API requests.
