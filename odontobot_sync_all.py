@@ -64,7 +64,7 @@ def _build_logger() -> logging.Logger:
 logger = _build_logger()
 logger.info(f"📝 Detailed log file: {_LOG_FILE}")
 
-DEFAULT_API_BASE_URL = "https://api-5nu4fdmgma-od.a.run.app/v1"
+DEFAULT_API_BASE_URL = "https://link-5nu4fdmgma-od.a.run.app/v1"
 ODB_CONNECTION_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odb_connection.json")
 TOMATO_CONFIG_PATH = "/Users/mateescu_m/Desktop/noma/sTomato/local_config.json"
 DB_PATH = "/Users/mateescu_m/Desktop/RuntimeDento_6.9.8/Dnt.fmpur"
@@ -73,22 +73,26 @@ PRACTITIONER_ID = "cmpog8fnz000iju047zqpfkaq" # Primary practitioner provider ID
 
 def load_config() -> tuple:
     """
-    Loads Tenant ID, Auth Bearer value, Base API URL, and whether a Tenant
-    Sync Key (odonto_sk_*) is in use.
+    Loads Tenant ID, Auth Bearer value, Base API URL, whether a Tenant
+    Sync Key (odonto_sk_*) is in use, and the active Calendar (CAL) application.
 
     Priority order:
       1. odb_connection.json  (Tenant Sync Key or legacy api_key + tenant)
       2. sTomato local_config.json  (legacy authorization + tenant_id)
       3. ODONTOBOT_AUTH_TOKEN environment variable  (fallback)
 
-    Returns: (tenant_id, bearer_value, api_base_url, is_sync_key)
+    Returns: (tenant_id, bearer_value, api_base_url, is_sync_key, cal_app)
       is_sync_key=True  → caller must send ONLY Authorization header (no X-Tenant-ID)
       is_sync_key=False → caller must send Authorization + X-Tenant-ID (legacy scheme)
+      cal_app           → name of the system acting as the Calendar (CAL) application,
+                          e.g. 'dento', 'doctolib'. Defaults to 'dento' if not set.
+                          Appointments are only synced when cal_app == 'dento'.
     """
     logger.info("⚙️ Loading configuration credentials...")
     tenant_id  = "demo_RO"
     auth_token = None
     is_sync_key = False
+    cal_app = "dento"  # default: dento is the CAL system unless overridden
     api_base_url = os.getenv("ODONTOBOT_API_BASE_URL", DEFAULT_API_BASE_URL)
 
     # ── 1. odb_connection.json (highest priority) ─────────────────────────────
@@ -98,6 +102,9 @@ def load_config() -> tuple:
                 odb = json.load(f)
             raw_key   = odb.get("api_key", "")
             odb_tenant = odb.get("tenant", tenant_id)
+            # Read optional cal_app field — which PMS system owns the calendar for this tenant.
+            # If absent, default to 'dento' (backward-compatible behaviour).
+            cal_app = odb.get("cal_app", "dento").strip().lower()
             if raw_key:
                 # Tenant Sync Key: odonto_sk_live_* / odonto_sk_test_*
                 # → self-identifying credential; no X-Tenant-ID needed
@@ -118,6 +125,10 @@ def load_config() -> tuple:
                         f"   » Legacy API key loaded from odb_connection.json. "
                         f"Tenant: '{tenant_id}'"
                     )
+            logger.info(
+                f"   » CAL application for tenant '{tenant_id}': '{cal_app}' "
+                f"({'✅ dento owns the calendar — appointments will sync' if cal_app == 'dento' else '⚠️ external CAL — appointments sync will be skipped'})"
+            )
         except Exception as e:
             logger.warning(f"⚠️ Failed to parse {ODB_CONNECTION_PATH}: {e}. Falling back.")
 
@@ -143,7 +154,7 @@ def load_config() -> tuple:
             logger.error("❌ Critical: Authorization token missing!")
             sys.exit(1)
 
-    return tenant_id, auth_token, api_base_url, is_sync_key
+    return tenant_id, auth_token, api_base_url, is_sync_key, cal_app
 
 def decrypt_database() -> bytearray:
     """
@@ -580,7 +591,7 @@ def main():
     if dry_run:
         logger.info("🧪 DRY RUN MODE ACTIVE: API calls will be logged but not sent to the cloud.")
 
-    tenant_id, auth_token, api_base_url, is_sync_key = load_config()
+    tenant_id, auth_token, api_base_url, is_sync_key, cal_app = load_config()
     decrypted_bytes = decrypt_database()
     data = extract_entities(decrypted_bytes)
     
@@ -593,7 +604,7 @@ def main():
     # ─────────────────────────────────────────────────────────────────────────
     # HTTP HELPER  – logs every outgoing request + incoming response to file
     # ─────────────────────────────────────────────────────────────────────────
-    def http_post(url: str, headers: dict, payload: dict | None = None, timeout: int = 30):
+    def http_post(url: str, headers: dict, payload: dict | None = None, timeout: int = 120):
         """
         Thin wrapper around requests.post that:
           • Logs the full outgoing request (URL, sanitised headers, body) to file
@@ -622,7 +633,7 @@ def main():
                     headers = {"content-type": "application/json"}
                 resp = MockResponse()
             else:
-                resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                resp = requests.post(url, json=payload, headers=headers, timeout=120)
             resp_info = {
                 "status":  resp.status_code,
                 "headers": dict(resp.headers),
@@ -766,42 +777,58 @@ def main():
     # ==================== 2. SYNC APPOINTMENTS ====================
     logger.info("--------------------------------------------------------------------------------------------------------")
     logger.info("📅 2. SYNCHRONIZING APPOINTMENTS PIPELINE...")
-    normalized_appts = []
-    for a in data["appointments"]:
-        normalized_appts.append({
-            "imported_id": a["appointment_id"],
-            "appointment_id": a["appointment_id"],
-            "patient_id": a["patient_id"],
-            "site_id": SITE_ID,
-            "practice_id": SITE_ID,
-            "organization_id": tenant_id,
-            "company_id": tenant_id,
-            "practitioner_id": PRACTITIONER_ID,
-            "provider_id": PRACTITIONER_ID,
-            "starts_at": a["starts_at"],
-            "start_time": a["starts_at"],
-            "duration_minutes": a["duration_minutes"],
-            "length": a["duration_minutes"],
-            "status": a["status"],
-            "reason": a["reason"],
-            "description": a["reason"],
-            "kind_name": a["kind_name"],
-            "kind_color": a["kind_color"],
-            "production_amount": 100.0,
-            "production_currency": "EUR",
-            "external_system_id": a["appointment_id"],
-            "external_system_code": "dento"
-        })
-        
-    sync_a_url = f"{api_base_url.rstrip('/')}/sync/appointments"
-    try:
-        response = http_post(sync_a_url, headers=sync_headers, payload={"appointments": normalized_appts}, timeout=30)
-        if response.status_code == 200:
-            logger.info(f"🎉 Appointments Ingested Successfully: {response.text}")
-        else:
-            logger.error(f"❌ Appointments Ingestion Failed (Status {response.status_code}): {response.text}")
-    except Exception as e:
-        logger.error(f"❌ Appointments Ingestion error: {e}")
+
+    # ── CAL application guard ─────────────────────────────────────────────────
+    # Appointments are ONLY synced when DentO is itself the active Calendar (CAL)
+    # application for this tenant. If the tenant uses an external calendar system
+    # (e.g. Doctolib Italy), DentO is NOT the source of truth for appointments,
+    # and syncing them here would overwrite or duplicate data managed elsewhere.
+    if cal_app != "dento":
+        logger.warning(
+            f"⏭️  SKIPPING Appointments Sync: tenant calendar (CAL) application is "
+            f"'{cal_app}', not 'dento'. "
+            f"Appointments are managed by '{cal_app}' — DentO appointment data will NOT be pushed."
+        )
+        logger.info(
+            f"   » To enable DentO appointment sync, set \"cal_app\": \"dento\" in odb_connection.json."
+        )
+    else:
+        normalized_appts = []
+        for a in data["appointments"]:
+            normalized_appts.append({
+                "imported_id": a["appointment_id"],
+                "appointment_id": a["appointment_id"],
+                "patient_id": a["patient_id"],
+                "site_id": SITE_ID,
+                "practice_id": SITE_ID,
+                "organization_id": tenant_id,
+                "company_id": tenant_id,
+                "practitioner_id": PRACTITIONER_ID,
+                "provider_id": PRACTITIONER_ID,
+                "starts_at": a["starts_at"],
+                "start_time": a["starts_at"],
+                "duration_minutes": a["duration_minutes"],
+                "length": a["duration_minutes"],
+                "status": a["status"],
+                "reason": a["reason"],
+                "description": a["reason"],
+                "kind_name": a["kind_name"],
+                "kind_color": a["kind_color"],
+                "production_amount": 100.0,
+                "production_currency": "EUR",
+                "external_system_id": a["appointment_id"],
+                "external_system_code": "dento"
+            })
+
+        sync_a_url = f"{api_base_url.rstrip('/')}/sync/appointments"
+        try:
+            response = http_post(sync_a_url, headers=sync_headers, payload={"appointments": normalized_appts}, timeout=30)
+            if response.status_code == 200:
+                logger.info(f"🎉 Appointments Ingested Successfully: {response.text}")
+            else:
+                logger.error(f"❌ Appointments Ingestion Failed (Status {response.status_code}): {response.text}")
+        except Exception as e:
+            logger.error(f"❌ Appointments Ingestion error: {e}")
 
     # ==================== 3. SYNC TREATMENTS ====================
     logger.info("--------------------------------------------------------------------------------------------------------")

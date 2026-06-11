@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("odontobot_sync")
 
-DEFAULT_API_BASE_URL = "https://api-5nu4fdmgma-od.a.run.app/v1"
+DEFAULT_API_BASE_URL = "https://link-5nu4fdmgma-od.a.run.app/v1"
 TOMATO_CONFIG_PATH = "/Users/mateescu_m/Desktop/noma/sTomato/local_config.json"
 SQLITE_DB_PATH = "/Users/mateescu_m/Desktop/RuntimeDento_6.9.8/Dnt_Decrypted_Sig.sqlite"
 

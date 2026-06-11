@@ -144,3 +144,49 @@ Everything is fully synchronized and polished for you to run `git push` whenever
 ### 2. Deletion of the C library (`fmptools`)
 - **What was done:** Deleted the `fmptools` source directory and compiled binaries. The workspace now contains only pure Python scripts and legal/documentation files.
 - **Result:** Increased sync performance (reduced dry-run/live runs from ~25s to <7s) and eliminated all external compilation/linker dependencies.
+
+## 2026-06-11 — Tenant and Credentials Update
+
+### 1. Tenant Key Rotation and Environment Migration
+- **What was done:** Rotated configuration credentials in `odb_connection.json` to configure the `demo_it2` tenant using access key `odonto_sk_test_2f0db43e79735563c9cf68b24866e6cfcb86989dc67eb870`.
+
+### 2. Link gateway subdomain update
+- Updated `DEFAULT_API_BASE_URL` to `https://link-5nu4fdmgma-od.a.run.app/v1` in both `odontobot_sync_all.py` and `odontobot_sync.py`.
+
+## 2026-06-11 — Connector: upfront CAL app guard — skip DentO appointments when external calendar is active
+
+### Context
+The `demo_it2` tenant uses **Doctolib Italy** as its active calendar (CAL) application. DentO is the clinical PMS only (patient records, treatments, quotes) — it is NOT the source of truth for appointments. Syncing DentO appointments to odonto.bot when Doctolib is the CAL would pollute the appointments table.
+
+### What was done
+
+**1. New `cal_app` field in `odb_connection.json`**
+
+Added optional `"cal_app"` string field to the local connection config:
+- `"cal_app": "dento"` → DentO is the CAL; appointments **will** be synced (default when field is absent — backward-compatible)
+- `"cal_app": "doctolib"` → Doctolib is the CAL; appointments sync is **skipped**
+
+**2. `load_config()` now reads and returns `cal_app`**
+
+- Reads `odb.get("cal_app", "dento")` from `odb_connection.json`.
+- Logs the resolved CAL app with a ✅ or ⚠️ indicator at startup.
+- Returns `cal_app` as the 5th element of the config tuple.
+
+**3. CAL guard block before `# 2. SYNC APPOINTMENTS`**
+
+Added a pre-flight check:
+```python
+if cal_app != "dento":
+    logger.warning("⏭️  SKIPPING Appointments Sync: tenant CAL is 'doctolib'...")
+else:
+    # full appointments sync as before
+```
+
+### Verified (dry-run)
+```
+   » CAL application for tenant 'demo_it2': 'doctolib' (⚠️ external CAL — appointments sync will be skipped)
+📅 2. SYNCHRONIZING APPOINTMENTS PIPELINE...
+⏭️  SKIPPING Appointments Sync: tenant calendar (CAL) application is 'doctolib', not 'dento'.
+💉 3. SYNCHRONIZING CLINICAL TREATMENTS PIPELINE...   ✅ continues
+💰 4. SYNCHRONIZING TREATMENT QUOTES PIPELINE...      ✅ continues
+```
